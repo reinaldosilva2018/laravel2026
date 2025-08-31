@@ -1,0 +1,54 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: docker/php/Dockerfile
+    container_name: php-app
+    working_dir: /var/www/html
+    volumes:
+      - ./src:/var/www/html:delegated
+    environment:
+      # ajuste conforme o .env do Laravel
+      APP_ENV: local
+      APP_DEBUG: "true"
+    depends_on:
+      - db
+
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: web
+    ports:
+      - "8080:80"
+    volumes:
+      - ./src:/var/www/html:ro
+      - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - app
+
+  db:
+    image: postgres:16-alpine
+    container_name: pg
+    environment:
+      POSTGRES_DB: laravel
+      POSTGRES_USER: laravel
+      POSTGRES_PASSWORD: secret
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+  # opcional: executar filas
+  queue:
+    build:
+      context: .
+      dockerfile: docker/php/Dockerfile
+    container_name: queue
+    working_dir: /var/www/html
+    command: php artisan queue:work --verbose --tries=3 --timeout=90
+    depends_on:
+      - db
+    volumes:
+      - ./src:/var/www/html:delegated
+
+volumes:
+  pgdata:
